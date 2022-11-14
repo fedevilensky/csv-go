@@ -42,7 +42,7 @@ type sTagged struct {
 	TaggedComplex complex64 `csv:"Complex"`
 	TaggedBool    bool      `csv:"Bool"`
 	TaggedUint    uint      `csv:"Uint"`
-	PointerInt    *int      `csv:"_"`
+	PointerInt    *int      `csv:"-"`
 }
 
 func TestUnmarshalReflectionTagged(t *testing.T) {

@@ -12,9 +12,10 @@ import (
 var (
 	ErrNoCommasAllowedInHeader = errors.New("no commas allowed in header")
 	ErrNoCommasAllowedInBody   = errors.New("no commas allowed in body")
+	ErrEmptySlice              = errors.New("empty slice was received")
 )
 
-type writer struct {
+type writer[T any] struct {
 	writer     *bufio.Writer
 	WithHeader bool
 	Comma      rune
@@ -39,15 +40,15 @@ type BodyMarshaler interface {
 
 // Creates a new writer from an io.Writer. Default separator is ',', default
 // UseCRLF is false, and default WithHeader is true.
-func NewWriter(w io.Writer) *writer {
-	return &writer{
+func NewWriter[T any](w io.Writer) *writer[T] {
+	return &writer[T]{
 		writer:     bufio.NewWriter(w),
 		Comma:      ',',
 		WithHeader: true,
 	}
 }
 
-func (w writer) WriteCSV(arr []interface{}) error {
+func (w writer[T]) WriteCSV(arr []T) error {
 	var EOL string
 	if w.UseCRLF {
 		EOL = "\r\n"
@@ -73,11 +74,12 @@ func (w writer) WriteCSV(arr []interface{}) error {
 		}
 	}
 
+	w.writer.Flush()
 	return nil
 }
 
-func (w writer) writeElem(e interface{}) error {
-	if mar, ok := e.(BodyMarshaler); ok {
+func (w writer[T]) writeElem(e T) error {
+	if mar, ok := any(e).(BodyMarshaler); ok {
 		for i, value := range mar.MarshalCSV() {
 			if i > 0 {
 				if _, err := w.writer.WriteRune(w.Comma); err != nil {
@@ -101,9 +103,21 @@ func (w writer) writeElem(e interface{}) error {
 		elem = elem.Elem()
 	}
 	fields := reflect.VisibleFields(elemType)
-	for i, field := range fields {
+	i := 0
+	for _, field := range fields {
 		if strings.ContainsRune(field.Name, w.Comma) {
 			return ErrNoCommasAllowedInBody
+		}
+		if !field.IsExported() {
+			continue
+		}
+		if field.Tag.Get("csv") == "-" {
+			continue
+		}
+		if i > 0 {
+			if _, err := w.writer.WriteRune(w.Comma); err != nil {
+				return err
+			}
 		}
 		str, err := getString(elem.FieldByName(field.Name))
 		if err != nil {
@@ -112,11 +126,7 @@ func (w writer) writeElem(e interface{}) error {
 		if _, err := w.writer.WriteString(str); err != nil {
 			return err
 		}
-		if i < len(fields)-1 {
-			if _, err := w.writer.WriteRune(w.Comma); err != nil {
-				return err
-			}
-		}
+		i++
 	}
 	return nil
 }
@@ -143,9 +153,12 @@ func getString(v reflect.Value) (string, error) {
 	return "", errors.New("unsupported type")
 }
 
-func (w writer) writeHeader(arr []interface{}) error {
-	elem := reflect.New(reflect.TypeOf(arr).Elem())
-	if mar, ok := elem.Interface().(HeaderMarshaler); ok {
+func (w writer[T]) writeHeader(arr []T) error {
+	if len(arr) == 0 {
+		return ErrEmptySlice
+	}
+
+	if mar, ok := any(arr[0]).(HeaderMarshaler); ok {
 		headerNames := mar.Header()
 		for i, name := range headerNames {
 			if i > 0 {
@@ -162,17 +175,31 @@ func (w writer) writeHeader(arr []interface{}) error {
 
 		}
 	} else {
+		elem := reflect.ValueOf(arr[0])
+		for elem.Kind() == reflect.Pointer {
+			elem = elem.Elem()
+		}
 		i := 0
 		for _, field := range reflect.VisibleFields(elem.Type()) {
-			if field.Anonymous {
+			if field.Anonymous || !field.IsExported() {
 				continue
+			}
+			headerName := field.Name
+			if tag, ok := field.Tag.Lookup("csv"); ok {
+				if tag == "-" {
+					continue
+				}
+				if strings.ContainsRune(tag, w.Comma) {
+					return ErrNoCommasAllowedInHeader
+				}
+				headerName = tag
 			}
 			if i > 0 {
 				if _, err := w.writer.WriteRune(w.Comma); err != nil {
 					return err
 				}
 			}
-			if _, err := w.writer.WriteString(field.Name); err != nil {
+			if _, err := w.writer.WriteString(headerName); err != nil {
 				return err
 			}
 			i++
@@ -183,6 +210,6 @@ func (w writer) writeHeader(arr []interface{}) error {
 
 // WriteCSVElems is the same as WriteCSV, but you do not have to pass a slice. This is useful
 // when you just have a couple of values.
-func (w writer) WriteCSVElems(elems ...interface{}) error {
+func (w writer[T]) WriteCSVElems(elems ...T) error {
 	return w.WriteCSV(elems)
 }

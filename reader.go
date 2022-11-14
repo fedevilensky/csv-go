@@ -125,7 +125,7 @@ func getField(fields []reflect.StructField, attr string) (int, error) {
 	}
 	// then look for name
 	for i, field := range fields {
-		if field.Name == attr || strings.ToLower(field.Name) == strings.ToLower(attr) {
+		if field.Name == attr || strings.EqualFold(field.Name, attr) {
 			// if field is tagged, we ignore the name
 			if _, ok := field.Tag.Lookup("csv"); !ok {
 				return i, nil
