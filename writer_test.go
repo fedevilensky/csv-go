@@ -56,7 +56,7 @@ func TestWriterCustomHeaderAndMarshaller(t *testing.T) {
 		PointerInt: new(int),
 	}}
 
-	w.WriteCSVElems(elems...)
+	w.WriteCSV(elems)
 	result := strBuf.String()
 
 	assert.Equal(t,
@@ -88,7 +88,7 @@ func TestArbitraryStruct(t *testing.T) {
 		PointerInt: new(int),
 	}}
 
-	w.WriteCSVElems(elems...)
+	w.WriteCSV(elems)
 	result := strBuf.String()
 
 	assert.Equal(t,
@@ -120,7 +120,7 @@ func TestStructWithTags(t *testing.T) {
 		PointerInt: new(int),
 	}}
 
-	w.WriteCSVElems(elems...)
+	w.WriteCSV(elems)
 	result := strBuf.String()
 
 	assert.Equal(t,
@@ -129,3 +129,27 @@ func TestStructWithTags(t *testing.T) {
 		result,
 	)
 }
+
+// TODO: WIP
+// func TestMap(t *testing.T) {
+// 	strBuf := strings.Builder{}
+// 	w := csv.NewWriter[map[string]any](&strBuf)
+// 	elems := []map[string]any{{
+// 		"String":     "string",
+// 		"Int":        1,
+// 		"Float":      1.1,
+// 		"complex":    1.1 + 1.1i,
+// 		"Bool":       true,
+// 		"Uint":       1,
+// 		"PointerInt": new(int),
+// 	}}
+
+// 	w.WriteCSV(elems)
+// 	result := strBuf.String()
+
+// 	assert.Equal(t,
+// 		"Custom Header String,Custom Header Int,Custom Header Float,Custom Header Bool,Custom Header Uint,Custom Header PointerInt\n"+
+// 			"string,1,1.1,true,1,0\n",
+// 		result,
+// 	)
+// }
