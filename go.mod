@@ -1,4 +1,4 @@
-module csv-go
+module github.comn/fedevilensky/csv-go
 
 go 1.19
 
